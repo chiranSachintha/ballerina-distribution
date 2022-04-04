@@ -35,9 +35,10 @@ public function main() returns error? {
     // If there is any error during the execution of the SQL query or
     // iteration of the result stream, the result stream will terminate and
     // return the error.
-    error? e = resultStream.forEach(function(record {} result) {
-        io:println("Full Customer details: ", result);
-    });
+    check from record {} result in resultStream
+        do {
+            io:println("Full Customer details: ", result);
+        };
 
     // The result of the count operation is provided as a record stream.
     stream<record {}, error?> resultStream2 =
@@ -55,7 +56,7 @@ public function main() returns error? {
     // when the stream is fully consumed or any error is encountered.
     // However, in case if the stream is not fully consumed, the stream
     // should be closed specifically.
-    error? er = resultStream2.close();
+    check resultStream2.close();
 
     // If a `Customer` stream type is defined when calling the query method,
     // The result is returned as a `Customer` record stream and the elements
@@ -64,9 +65,10 @@ public function main() returns error? {
         mysqlClient->query(`SELECT * FROM Customers`);
 
     // Iterates the customer stream.
-    error? e2 = customerStream.forEach(function(Customer customer) {
-        io:println("Full Customer details: ", customer);
-    });
+    check from Customer customer in customerStream
+        do {
+            io:println("Full Customer details: ", customer);
+        };
 
     // Performs the cleanup after the example.
     check afterExample(mysqlClient);
@@ -77,21 +79,20 @@ function beforeExample() returns sql:Error? {
     mysql:Client mysqlClient = check new (user = "root", password = "Test@123");
 
     // Creates a database.
-    sql:ExecutionResult result = 
-        check mysqlClient->execute(`CREATE DATABASE MYSQL_BBE`);
+    _ = check mysqlClient->execute(`CREATE DATABASE MYSQL_BBE`);
 
     // Creates a table in the database.
-    result = check mysqlClient->execute(`CREATE TABLE MYSQL_BBE.Customers
+    _ = check mysqlClient->execute(`CREATE TABLE MYSQL_BBE.Customers
             (customerId INTEGER NOT NULL AUTO_INCREMENT, firstName
             VARCHAR(300), lastName  VARCHAR(300), registrationID INTEGER,
             creditLimit DOUBLE, country  VARCHAR(300),
             PRIMARY KEY (customerId))`);
 
     // Adds the records to the newly-created table.
-    result = check mysqlClient->execute(`INSERT INTO MYSQL_BBE.Customers
+    _ = check mysqlClient->execute(`INSERT INTO MYSQL_BBE.Customers
             (firstName, lastName, registrationID,creditLimit,country) VALUES
             ('Peter','Stuart', 1, 5000.75, 'USA')`);
-    result = check mysqlClient->execute(`INSERT INTO MYSQL_BBE.Customers
+    _ = check mysqlClient->execute(`INSERT INTO MYSQL_BBE.Customers
             (firstName, lastName, registrationID,creditLimit,country) VALUES
             ('Dan', 'Brown', 2, 10000, 'UK')`);
 
@@ -101,8 +102,8 @@ function beforeExample() returns sql:Error? {
 // Cleans up the database after running the example.
 function afterExample(mysql:Client mysqlClient) returns sql:Error? {
     // Cleans the database.
-    sql:ExecutionResult result = 
-            check mysqlClient->execute(`DROP DATABASE MYSQL_BBE`);
+    _ = check mysqlClient->execute(`DROP DATABASE MYSQL_BBE`);
+
     // Closes the MySQL client.
     check mysqlClient.close();
 }

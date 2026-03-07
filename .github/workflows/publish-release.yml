@@ -7,10 +7,6 @@ on:
         description: 'Explicit release version (supports 4th digit), e.g. 2201.13.2.1'
         required: false
         default: ''
-      ballerinaLangVersion:
-        description: 'Ballerina language package version to resolve (e.g. 2201.13.2.2)'
-        required: false
-        default: ''
       langPackageRepoPath:
         description: 'GitHub package repo path (use owner/* to resolve lang + dev-tools, e.g. chiranSachintha/*)'
         required: false
@@ -77,12 +73,15 @@ jobs:
           packagePAT: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           githubAccessToken: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LANG_VERSION="${{ github.event.inputs.ballerinaLangVersion }}"
+          LANG_VERSION=$(grep -w 'ballerinaLangVersion' gradle.properties | cut -d= -f2 | xargs)
           if [ -z "$LANG_VERSION" ]; then
-            LANG_VERSION=$(grep -w 'ballerinaLangVersion' gradle.properties | cut -d= -f2 | xargs)
+            echo "ballerinaLangVersion is empty in gradle.properties."
+            exit 1
           fi
-          if [ -z "$LANG_VERSION" ]; then
-            echo "ballerinaLangVersion is empty. Provide workflow input 'ballerinaLangVersion'."
+
+          DEVTOOLS_VERSION=$(grep -w 'devToolsVersion' gradle.properties | cut -d= -f2 | xargs)
+          if [ -z "$DEVTOOLS_VERSION" ]; then
+            echo "devToolsVersion is empty in gradle.properties."
             exit 1
           fi
 
@@ -93,9 +92,10 @@ jobs:
           export packageRepoPath="$PACKAGE_REPO_PATH"
 
           echo "Using ballerinaLangVersion=$LANG_VERSION"
+          echo "Using devToolsVersion=$DEVTOOLS_VERSION"
           echo "Using packageRepoPath=$packageRepoPath"
 
-          GRADLE_ARGS="build -x project-api-tests:test -Pversion=${VERSION} -x test -PballerinaLangVersion=${LANG_VERSION}"
+          GRADLE_ARGS="build -x project-api-tests:test -Pversion=${VERSION} -x test -PballerinaLangVersion=${LANG_VERSION} -PdevToolsVersion=${DEVTOOLS_VERSION}"
           ./gradlew $GRADLE_ARGS
 
       - name: Smoke test built pack

@@ -7,6 +7,10 @@ on:
         description: 'Explicit release version (supports 4th digit), e.g. 2201.13.2.4'
         required: false
         default: ''
+      integratorVersion:
+        description: 'WSO2 Integrator wrapper version, e.g. 5.0.0'
+        required: false
+        default: '5.0.0'
       langPackageRepoPath:
         description: 'GitHub package repo path (use owner/* to resolve lang + dev-tools, e.g. chiranSachintha/*)'
         required: false
@@ -104,6 +108,30 @@ jobs:
           PACK_DIR=$(find /tmp/bal-pack-local -mindepth 1 -maxdepth 1 -type d | head -n 1)
           "$PACK_DIR/bin/bal" version
 
+      - name: Build WSO2 Integrator wrapper pack
+        id: wrapper-pack
+        run: |
+          INTEGRATOR_VERSION="${{ github.event.inputs.integratorVersion }}"
+          if [ -z "$INTEGRATOR_VERSION" ]; then
+            INTEGRATOR_VERSION="5.0.0"
+          fi
+
+          BALLERINA_PACK="ballerina-${{ steps.version-set.outputs.sversion }}.zip"
+          WRAPPER_NAME="wso2-integrator-${INTEGRATOR_VERSION}.zip"
+
+          rm -rf /tmp/wso2-integrator-wrapper
+          mkdir -p /tmp/wso2-integrator-wrapper
+          unzip -q "ballerina/build/distributions/${BALLERINA_PACK}" -d /tmp/wso2-integrator-wrapper
+
+          (
+            cd /tmp/wso2-integrator-wrapper
+            BAL_DIR=$(find . -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            zip -q -r "/tmp/${WRAPPER_NAME}" "${BAL_DIR}"
+          )
+
+          mv "/tmp/${WRAPPER_NAME}" "./${WRAPPER_NAME}"
+          echo "::set-output name=wrapperName::${WRAPPER_NAME}"
+
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
@@ -116,26 +144,27 @@ jobs:
           draft: false
           prerelease: ${{ github.event.inputs.isPreRelease }}
 
-      - name: Upload short zip artifact
+      - name: Upload WSO2 Integrator wrapper artifact
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.sversion }}.zip
-          asset_path: ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip
+          asset_name: ${{ steps.wrapper-pack.outputs.wrapperName }}
+          asset_path: ./${{ steps.wrapper-pack.outputs.wrapperName }}
           asset_content_type: application/octet-stream
 
-      - name: Smoke test published pack
+      - name: Smoke test published wrapper pack
         env:
           GH_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          URL="https://github.com/${{ github.repository }}/releases/download/v${{ steps.version-set.outputs.taggedVersion }}/ballerina-${{ steps.version-set.outputs.sversion }}.zip"
+          URL="https://github.com/${{ github.repository }}/releases/download/v${{ steps.version-set.outputs.taggedVersion }}/${{ steps.wrapper-pack.outputs.wrapperName }}"
           echo default login x-access-token password "$GH_TOKEN" > _netrc
-          curl --netrc-file _netrc -L -o ballerina-published-short.zip "$URL"
+          curl --netrc-file _netrc -L -o wso2-integrator-published.zip "$URL"
 
-          rm -rf /tmp/bal-pack-published-short
-          mkdir -p /tmp/bal-pack-published-short
-          unzip -q ballerina-published-short.zip -d /tmp/bal-pack-published-short
-          SHORT_PACK_DIR=$(find /tmp/bal-pack-published-short -mindepth 1 -maxdepth 1 -type d | head -n 1)
-          "$SHORT_PACK_DIR/bin/bal" version
+          rm -rf /tmp/wso2-integrator-published
+          mkdir -p /tmp/wso2-integrator-published
+          unzip -q wso2-integrator-published.zip -d /tmp/wso2-integrator-published
+
+          PACK_DIR=$(find /tmp/wso2-integrator-published -mindepth 1 -maxdepth 1 -type d | head -n 1)
+          "$PACK_DIR/bin/bal" version

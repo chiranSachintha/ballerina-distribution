@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       releaseVersion:
-        description: 'Explicit release version (supports 4th digit), e.g. 2201.13.2.1'
+        description: 'Explicit release version (supports 4th digit), e.g. 2201.13.2.4'
         required: false
         default: ''
       langPackageRepoPath:
@@ -60,7 +60,6 @@ jobs:
           echo VERSION=$RELEASE_VERSION >> $GITHUB_ENV
           echo GIT_TAG=$TAGGED_VERSION >> $GITHUB_ENV
           echo "::set-output name=sversion::$SHORT_VERSION"
-          echo "::set-output name=longVersion::$RELEASE_VERSION-swan-lake"
           echo "::set-output name=taggedVersion::$TAGGED_VERSION"
 
       - name: Grant execute permission for gradlew
@@ -95,37 +94,15 @@ jobs:
           echo "Using devToolsVersion=$DEVTOOLS_VERSION"
           echo "Using packageRepoPath=$packageRepoPath"
 
-          GRADLE_ARGS="build -x project-api-tests:test -Pversion=${VERSION} -x test -PballerinaLangVersion=${LANG_VERSION} -PdevToolsVersion=${DEVTOOLS_VERSION}"
-          ./gradlew $GRADLE_ARGS
+          ./gradlew build -x project-api-tests:test -Pversion=${VERSION} -x test -PballerinaLangVersion=${LANG_VERSION} -PdevToolsVersion=${DEVTOOLS_VERSION}
 
       - name: Smoke test built pack
         run: |
           rm -rf /tmp/bal-pack-local
           mkdir -p /tmp/bal-pack-local
-          unzip -q ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}.zip -d /tmp/bal-pack-local
+          unzip -q ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip -d /tmp/bal-pack-local
           PACK_DIR=$(find /tmp/bal-pack-local -mindepth 1 -maxdepth 1 -type d | head -n 1)
           "$PACK_DIR/bin/bal" version
-
-      - name: cosign-installer
-        uses: sigstore/cosign-installer@v3.5.0
-
-      - name: Generate pack hashes
-        run: |
-          openssl dgst -sha256 -out ballerina-${{ steps.version-set.outputs.longVersion }}.zip.sha256 ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}.zip
-          openssl dgst -sha256 -out ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip.sha256 ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip
-          openssl dgst -sha256 -out ballerina-${{ steps.version-set.outputs.sversion }}.zip.sha256 ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip
-
-      - name: Sign packs
-        run: |
-          cosign sign-blob ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}.zip --output-certificate ballerina-${{ steps.version-set.outputs.longVersion }}.pem --output-signature ballerina-${{ steps.version-set.outputs.longVersion }}.sig --yes
-          cosign sign-blob ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip --output-certificate ballerina-${{ steps.version-set.outputs.longVersion }}-windows.pem --output-signature ballerina-${{ steps.version-set.outputs.longVersion }}-windows.sig --yes
-          cosign sign-blob ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip --output-certificate ballerina-${{ steps.version-set.outputs.sversion }}.pem --output-signature ballerina-${{ steps.version-set.outputs.sversion }}.sig --yes
-
-      - name: Verify pack signatures
-        run: |
-          cosign verify-blob ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}.zip --certificate ballerina-${{ steps.version-set.outputs.longVersion }}.pem --signature ballerina-${{ steps.version-set.outputs.longVersion }}.sig --certificate-identity=https://github.com/${{ github.repository }}/.github/workflows/publish-release.yml@${{ github.ref }} --certificate-oidc-issuer=https://token.actions.githubusercontent.com
-          cosign verify-blob ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip --certificate ballerina-${{ steps.version-set.outputs.longVersion }}-windows.pem --signature ballerina-${{ steps.version-set.outputs.longVersion }}-windows.sig --certificate-identity=https://github.com/${{ github.repository }}/.github/workflows/publish-release.yml@${{ github.ref }} --certificate-oidc-issuer=https://token.actions.githubusercontent.com
-          cosign verify-blob ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip --certificate ballerina-${{ steps.version-set.outputs.sversion }}.pem --signature ballerina-${{ steps.version-set.outputs.sversion }}.sig --certificate-identity=https://github.com/${{ github.repository }}/.github/workflows/publish-release.yml@${{ github.ref }} --certificate-oidc-issuer=https://token.actions.githubusercontent.com
 
       - name: Create release
         id: create_release
@@ -139,86 +116,6 @@ jobs:
           draft: false
           prerelease: ${{ github.event.inputs.isPreRelease }}
 
-      - name: Upload swan-lake zip artifact
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}.zip
-          asset_path: ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}.zip
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake zip certificate
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}.pem
-          asset_path: ./ballerina-${{ steps.version-set.outputs.longVersion }}.pem
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake zip signature
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}.sig
-          asset_path: ./ballerina-${{ steps.version-set.outputs.longVersion }}.sig
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake zip hash
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}.zip.sha256
-          asset_path: ballerina-${{ steps.version-set.outputs.longVersion }}.zip.sha256
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake windows zip artifact
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip
-          asset_path: ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake windows zip certificate
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}-windows.pem
-          asset_path: ./ballerina-${{ steps.version-set.outputs.longVersion }}-windows.pem
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake windows zip signature
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}-windows.sig
-          asset_path: ./ballerina-${{ steps.version-set.outputs.longVersion }}-windows.sig
-          asset_content_type: application/octet-stream
-
-      - name: Upload swan-lake windows zip hash
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip.sha256
-          asset_path: ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip.sha256
-          asset_content_type: application/octet-stream
-
       - name: Upload short zip artifact
         uses: actions/upload-release-asset@v1
         env:
@@ -229,61 +126,16 @@ jobs:
           asset_path: ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip
           asset_content_type: application/octet-stream
 
-      - name: Upload short zip certificate
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.sversion }}.pem
-          asset_path: ./ballerina-${{ steps.version-set.outputs.sversion }}.pem
-          asset_content_type: application/octet-stream
-
-      - name: Upload short zip signature
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.sversion }}.sig
-          asset_path: ./ballerina-${{ steps.version-set.outputs.sversion }}.sig
-          asset_content_type: application/octet-stream
-
-      - name: Upload short zip hash
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.sversion }}.zip.sha256
-          asset_path: ballerina-${{ steps.version-set.outputs.sversion }}.zip.sha256
-          asset_content_type: application/octet-stream
-
-      - name: Smoke test published packs
+      - name: Smoke test published pack
         env:
           GH_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          URL="https://github.com/${{ github.repository }}/releases/download/v${{ steps.version-set.outputs.taggedVersion }}/ballerina-${{ steps.version-set.outputs.longVersion }}.zip"
-          WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/v${{ steps.version-set.outputs.taggedVersion }}/ballerina-${{ steps.version-set.outputs.longVersion }}-windows.zip"
-          SHORT_URL="https://github.com/${{ github.repository }}/releases/download/v${{ steps.version-set.outputs.taggedVersion }}/ballerina-${{ steps.version-set.outputs.sversion }}.zip"
+          URL="https://github.com/${{ github.repository }}/releases/download/v${{ steps.version-set.outputs.taggedVersion }}/ballerina-${{ steps.version-set.outputs.sversion }}.zip"
           echo default login x-access-token password "$GH_TOKEN" > _netrc
-          curl --netrc-file _netrc -L -o ballerina-published.zip "$URL"
-          curl --netrc-file _netrc -L -o ballerina-published-windows.zip "$WINDOWS_URL"
-          curl --netrc-file _netrc -L -o ballerina-published-short.zip "$SHORT_URL"
-
-          rm -rf /tmp/bal-pack-published
-          mkdir -p /tmp/bal-pack-published
-          unzip -q ballerina-published.zip -d /tmp/bal-pack-published
-          PACK_DIR=$(find /tmp/bal-pack-published -mindepth 1 -maxdepth 1 -type d | head -n 1)
-          "$PACK_DIR/bin/bal" version
+          curl --netrc-file _netrc -L -o ballerina-published-short.zip "$URL"
 
           rm -rf /tmp/bal-pack-published-short
           mkdir -p /tmp/bal-pack-published-short
           unzip -q ballerina-published-short.zip -d /tmp/bal-pack-published-short
           SHORT_PACK_DIR=$(find /tmp/bal-pack-published-short -mindepth 1 -maxdepth 1 -type d | head -n 1)
           "$SHORT_PACK_DIR/bin/bal" version
-
-          rm -rf /tmp/bal-pack-published-windows
-          mkdir -p /tmp/bal-pack-published-windows
-          unzip -q ballerina-published-windows.zip -d /tmp/bal-pack-published-windows
-          test -f /tmp/bal-pack-published-windows/ballerina-${{ steps.version-set.outputs.longVersion }}-windows/bin/bal.bat

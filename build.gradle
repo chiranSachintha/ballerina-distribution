@@ -27,6 +27,7 @@ description = 'Ballerina - Tools - Parent'
 
 ext {
     ballerinaLangVersion = project.ballerinaLangVersion
+    jballerinaToolsVersion = project.findProperty("jballerinaToolsVersion") ?: project.ballerinaLangVersion
     shortVersion = project.version.split("-")[0]
     c2cVersion = project.c2cVersion
     ballerinaJreVersion = project.ballerinaJreVersion
@@ -141,7 +142,7 @@ subprojects {
     }
 
     dependencies {
-        jbalTools "org.ballerinalang:jballerina-tools:${ballerinaLangVersion}@zip"
+        jbalTools "org.ballerinalang:jballerina-tools:${jballerinaToolsVersion}@zip"
 
         /* Ballerina Dev Tools */
         devTools "org.ballerinalang:ballerina-dev-tools:${devToolsVersion}"

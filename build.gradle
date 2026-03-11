@@ -27,7 +27,9 @@ description = 'Ballerina - Tools - Parent'
 
 ext {
     ballerinaLangVersion = project.ballerinaLangVersion
-    jballerinaToolsVersion = project.findProperty("jballerinaToolsVersion") ?: project.ballerinaLangVersion
+    def updateLevel = (project.findProperty("updateLevel") ?: "0").toString().trim()
+    jballerinaToolsVersion = updateLevel.isInteger() && updateLevel.toInteger() > 0 ?
+            "${project.ballerinaLangVersion}.${updateLevel}" : project.ballerinaLangVersion
     shortVersion = project.version.split("-")[0]
     c2cVersion = project.c2cVersion
     ballerinaJreVersion = project.ballerinaJreVersion

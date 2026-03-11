@@ -15,6 +15,7 @@ on:
 permissions:
   id-token: write
   contents: write
+  packages: read
 
 jobs:
   publish-release:
@@ -62,6 +63,21 @@ jobs:
           DEVTOOLS_VERSION=$(grep -w 'devToolsVersion' gradle.properties | cut -d= -f2 | xargs)
           ./gradlew build -x project-api-tests:test -Pversion="${VERSION}" -x test -PballerinaLangVersion="${LANG_VERSION}" -PdevToolsVersion="${DEVTOOLS_VERSION}"
 
+      - name: Create WSO2 Integrator wrapper zip
+        run: |
+          INTEGRATOR_VERSION="5.0.0"
+          SHORT_VERSION="${{ steps.version-set.outputs.sversion }}"
+          ROOT_DIR="wso2-integrator-${INTEGRATOR_VERSION}"
+          SOURCE_ZIP="ballerina/build/distributions/ballerina-${SHORT_VERSION}.zip"
+          WORK_DIR="${RUNNER_TEMP}/wso2-integrator-pack"
+
+          rm -rf "${WORK_DIR}"
+          mkdir -p "${WORK_DIR}/${ROOT_DIR}"
+          unzip -q "${SOURCE_ZIP}" -d "${WORK_DIR}/${ROOT_DIR}"
+
+          (cd "${WORK_DIR}" && zip -q -r "${GITHUB_WORKSPACE}/${ROOT_DIR}.zip" "${ROOT_DIR}")
+          echo "FINAL_ASSET=${ROOT_DIR}.zip" >> "${GITHUB_ENV}"
+
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
@@ -74,12 +90,12 @@ jobs:
           draft: false
           prerelease: ${{ github.event.inputs.isPreRelease }}
 
-      - name: Upload short zip artifact
+      - name: Upload integrator zip artifact
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.repository_owner == 'ballerina-platform' && secrets.BALLERINA_BOT_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: ballerina-${{ steps.version-set.outputs.sversion }}.zip
-          asset_path: ballerina/build/distributions/ballerina-${{ steps.version-set.outputs.sversion }}.zip
+          asset_name: ${{ env.FINAL_ASSET }}
+          asset_path: ${{ github.workspace }}/${{ env.FINAL_ASSET }}
           asset_content_type: application/octet-stream

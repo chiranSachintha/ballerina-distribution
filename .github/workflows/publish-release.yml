@@ -71,6 +71,11 @@ jobs:
         run: |
           INTEGRATOR_VERSION="5.0.0"
           SHORT_VERSION="${{ steps.version-set.outputs.sversion }}"
+          UPDATE_LEVEL=$(grep -w 'updateLevel' gradle.properties | cut -d= -f2 | xargs)
+          PACK_VERSION="$SHORT_VERSION"
+          if [ -n "$UPDATE_LEVEL" ] && [ "$UPDATE_LEVEL" != "0" ]; then
+            PACK_VERSION="${SHORT_VERSION}.${UPDATE_LEVEL}"
+          fi
           ROOT_DIR="wso2-integrator-${INTEGRATOR_VERSION}"
           SOURCE_ZIP="ballerina/build/distributions/ballerina-${SHORT_VERSION}.zip"
           WORK_DIR="${RUNNER_TEMP}/wso2-integrator-pack"
@@ -78,6 +83,9 @@ jobs:
           rm -rf "${WORK_DIR}"
           mkdir -p "${WORK_DIR}/${ROOT_DIR}"
           unzip -q "${SOURCE_ZIP}" -d "${WORK_DIR}/${ROOT_DIR}"
+          if [ "${PACK_VERSION}" != "${SHORT_VERSION}" ] && [ -d "${WORK_DIR}/${ROOT_DIR}/ballerina-${SHORT_VERSION}" ]; then
+            mv "${WORK_DIR}/${ROOT_DIR}/ballerina-${SHORT_VERSION}" "${WORK_DIR}/${ROOT_DIR}/ballerina-${PACK_VERSION}"
+          fi
 
           (cd "${WORK_DIR}" && zip -q -r "${GITHUB_WORKSPACE}/${ROOT_DIR}.zip" "${ROOT_DIR}")
           echo "FINAL_ASSET=${ROOT_DIR}.zip" >> "${GITHUB_ENV}"

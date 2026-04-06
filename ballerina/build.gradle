@@ -1584,6 +1584,17 @@ task generateCache(dependsOn: ':cache-generator:build') {
     }
 }
 
+task copyUpdateCommandJar(dependsOn: ':update-command:build') {
+    doLast {
+        def updateCommandLibDir = "${buildDir}/target/extracted-distributions/jballerina-tools-zip/" +
+                "jballerina-tools-${publishedLangVersion}/bre/lib"
+        copy {
+            from "${project.rootDir}/update-command/build/libs/update-command-${project.version}.jar"
+            into updateCommandLibDir
+        }
+    }
+}
+
 task generateBalToolsToml () {
     doFirst {
         download.run {
@@ -1690,6 +1701,7 @@ combineDocs.dependsOn filterApiDocs
 packageDist.dependsOn buildDistRepo
 packageDist.dependsOn combineDocs
 packageDist.dependsOn generateCache
+packageDist.dependsOn copyUpdateCommandJar
 packageDistZip.dependsOn packageDist
 packageDistLinux.dependsOn packageDistZip
 packageDistLinux.dependsOn unzipDistForTests

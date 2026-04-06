@@ -1,0 +1,10 @@
+NAME
+       bal update - Run the WSO2 update tool
+
+SYNOPSIS
+       bal update [args]
+
+DESCRIPTION
+       Extracts any zip archives under the distribution repo directory and then
+       delegates execution to the WSO2 update tool available in the bin
+       directory.

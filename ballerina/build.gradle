@@ -243,7 +243,7 @@ def emudhraBlockedCertificates = file("${rootDir}/resources/emudhra-blocked-cert
                 def store = KeyStore.getInstance(truststore, password)
                 def aliases = Collections.list(store.aliases()).findAll { alias ->
                     def certificate = store.getCertificate(alias)
-                    certificate instanceof X509Certificate &&
+                    store.isCertificateEntry(alias) && certificate instanceof X509Certificate &&
                             new LdapName(certificate.subjectX500Principal.name).rdns.any { rdn ->
                                 rdn.type.equalsIgnoreCase('CN') && emudhraDistrustedRoots.contains(rdn.value)
                             }
